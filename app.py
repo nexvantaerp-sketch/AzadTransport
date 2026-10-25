@@ -17,10 +17,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 st.set_page_config(
-    page_title="New United Azad Transport",
+    page_title="New United Azad Transport ERP",
     page_icon="🚛",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 from utils.styles import inject_premium_css, premium_header, gold_divider
@@ -48,39 +48,49 @@ def check_login(username: str, password: str) -> bool:
     return False
 
 def show_login():
+    # Hide sidebar via CSS when on login screen
     st.markdown("""
-    <div style="display:flex;justify-content:center;align-items:center;min-height:80vh;">
-    <div style="width:100%;max-width:420px;">
-    <div class="premium-card" style="text-align:center;padding:40px;">
-        <div style="font-size:3.5rem;margin-bottom:10px;">🚛</div>
-        <div style="font-size:1.5rem;font-weight:800;color:#D4AF37;margin-bottom:4px;">
+        <style>
+            [data-testid="stSidebar"] {display: none !important;}
+            [data-testid="collapsedControl"] {display: none !important;}
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div style="display:flex;justify-content:center;align-items:center;min-height:82vh;padding:20px;">
+    <div style="width:100%;max-width:440px;">
+    <div class="premium-card" style="text-align:center;padding:40px 30px;background:linear-gradient(135deg,#161b22,#1c2333);border:1px solid rgba(212,175,55,0.3);box-shadow:0 12px 40px rgba(0,0,0,0.6);">
+        <div style="font-size:3.8rem;margin-bottom:12px;filter:drop-shadow(0 4px 10px rgba(212,175,55,0.3));">🚛</div>
+        <div style="font-size:1.55rem;font-weight:800;color:#D4AF37;letter-spacing:1px;margin-bottom:6px;">
             NEW UNITED AZAD TRANSPORT</div>
-        <div style="font-size:.85rem;color:#8b949e;margin-bottom:30px;">
-            نیو یونائیٹڈ آزاد ٹرانسپورٹ<br>Molasses Transportation ERP</div>
+        <div style="font-size:.9rem;color:#c9d1d9;margin-bottom:28px;font-weight:500;">
+            نیو یونائیٹڈ آزاد ٹرانسپورٹ<br><span style="color:#8b949e;font-size:.8rem;">Molasses Transportation Management ERP</span></div>
     </div></div></div>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 1, 1])
+    col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
-        with st.form("login_form"):
-            st.markdown("### 🔐 Login")
-            username = st.text_input("Username / آئی ڈی", placeholder="Enter your username")
-            password = st.text_input("Password / پاسورڈ", type="password", placeholder="Enter your password")
-            submitted = st.form_submit_button("🔓 Login / لاگ ان", use_container_width=True)
+        with st.form("login_form", clear_on_submit=False):
+            st.markdown("### 🔐 Secure Portal Login")
+            st.markdown("<p style='color:#8b949e;font-size:0.85rem;margin-bottom:20px;'>Enter your credentials to access the ERP system.</p>", unsafe_allow_html=True)
+            username = st.text_input("Username / آئی ڈی", placeholder="Enter username (e.g. admin)")
+            password = st.text_input("Password / پاسورڈ", type="password", placeholder="Enter password")
+            st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+            submitted = st.form_submit_button("🔓 Login to Dashboard", use_container_width=True)
 
             if submitted:
                 if not username or not password:
                     st.error("⚠️ Please enter username and password")
                 elif check_login(username, password):
-                    st.success("✅ Login successful! / لاگ ان کامیاب")
+                    st.success("✅ Login successful! Loading dashboard...")
                     st.rerun()
                 else:
                     st.error("❌ Invalid username or password / غلط آئی ڈی یا پاسورڈ")
 
         st.markdown("""
-        <div style="text-align:center;margin-top:20px;color:#8b949e;font-size:.8rem;">
-            Default: admin / admin123<br>
-            🔒 Secured by Supabase
+        <div style="text-align:center;margin-top:20px;color:#8b949e;font-size:.82rem;background:rgba(22,27,34,0.7);padding:14px;border-radius:12px;border:1px solid rgba(212,175,55,0.1);">
+            <strong style="color:#D4AF37;">Default Login:</strong> admin / admin123<br>
+            <span style="font-size:.75rem;color:#8b949e;margin-top:4px;display:inline-block;">🔒 Secure Supabase Cloud Authentication</span>
         </div>""", unsafe_allow_html=True)
 
 # ─── Main App ────────────────────────────────────────────────
