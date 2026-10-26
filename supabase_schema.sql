@@ -1,7 +1,13 @@
--- NEW UNITED AZAD TRANSPORT — Supabase Database Schema
+-- ============================================================
+-- NEW UNITED AZAD TRANSPORT ERP — Supabase schema (v2)
+-- FRESH install: run this whole file once in Supabase → SQL Editor.
+-- EXISTING database: run migration_v2.sql instead (keeps your data).
+-- The admin user (admin / admin123) is created automatically by the app
+-- on first launch — change the password immediately from Settings.
+-- ============================================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TABLE vehicles (
+CREATE TABLE IF NOT EXISTS vehicles (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     vehicle_number VARCHAR(50) NOT NULL UNIQUE,
     vehicle_type VARCHAR(30) DEFAULT 'Tanker',
@@ -15,7 +21,7 @@ CREATE TABLE vehicles (
     created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE drivers (
+CREATE TABLE IF NOT EXISTS drivers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     name VARCHAR(200) NOT NULL, cnic VARCHAR(20) UNIQUE,
     phone VARCHAR(20), phone2 VARCHAR(20), address TEXT,
@@ -26,7 +32,7 @@ CREATE TABLE drivers (
     created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE customers (
+CREATE TABLE IF NOT EXISTS customers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     name VARCHAR(300) NOT NULL, short_name VARCHAR(50),
     customer_type VARCHAR(30) DEFAULT 'Sugar Mill',
@@ -39,7 +45,7 @@ CREATE TABLE customers (
     created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE trips (
+CREATE TABLE IF NOT EXISTS trips (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     trip_number VARCHAR(50) NOT NULL UNIQUE,
     trip_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -53,6 +59,7 @@ CREATE TABLE trips (
     weight_difference DECIMAL(12,2) DEFAULT 0,
     weighbridge_slip_loading VARCHAR(100),
     weighbridge_slip_unloading VARCHAR(100),
+    freight_basis VARCHAR(30) DEFAULT 'Loading Weight',
     rate_per_ton DECIMAL(12,2) DEFAULT 0,
     total_freight DECIMAL(14,2) DEFAULT 0,
     distance_km DECIMAL(10,2) DEFAULT 0,
@@ -61,8 +68,7 @@ CREATE TABLE trips (
     created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-
-CREATE TABLE expenses (
+CREATE TABLE IF NOT EXISTS expenses (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
     trip_id UUID REFERENCES trips(id), vehicle_id UUID REFERENCES vehicles(id),
@@ -72,24 +78,30 @@ CREATE TABLE expenses (
     receipt_number VARCHAR(50), notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE TABLE invoices (
+
+CREATE TABLE IF NOT EXISTS invoices (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     invoice_number VARCHAR(50) NOT NULL UNIQUE,
     invoice_date DATE NOT NULL DEFAULT CURRENT_DATE,
     customer_id UUID REFERENCES customers(id),
-    total_amount DECIMAL(14,2) DEFAULT 0, paid_amount DECIMAL(14,2) DEFAULT 0,
+    total_amount DECIMAL(14,2) DEFAULT 0,
+    tax_amount DECIMAL(14,2) DEFAULT 0,
+    net_amount DECIMAL(14,2) DEFAULT 0,
+    paid_amount DECIMAL(14,2) DEFAULT 0,
     balance DECIMAL(14,2) DEFAULT 0, due_date DATE,
     status VARCHAR(20) DEFAULT 'Pending', notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE TABLE invoice_items (
+
+CREATE TABLE IF NOT EXISTS invoice_items (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
     trip_id UUID REFERENCES trips(id), description TEXT,
     quantity DECIMAL(12,2) DEFAULT 1, rate DECIMAL(12,2) DEFAULT 0,
     amount DECIMAL(14,2) DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE TABLE payments (
+
+CREATE TABLE IF NOT EXISTS payments (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
     invoice_id UUID REFERENCES invoices(id), customer_id UUID REFERENCES customers(id),
@@ -97,10 +109,11 @@ CREATE TABLE payments (
     payment_method VARCHAR(30) DEFAULT 'Bank Transfer',
     reference_number VARCHAR(100), bank_name VARCHAR(100),
     cheque_number VARCHAR(50), cheque_date DATE,
-    status VARCHAR(20) DEFAULT 'Received', notes TEXT,
+    status VARCHAR(30) DEFAULT 'Received', notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE TABLE driver_advances (
+
+CREATE TABLE IF NOT EXISTS driver_advances (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     advance_date DATE NOT NULL DEFAULT CURRENT_DATE,
     driver_id UUID REFERENCES drivers(id), trip_id UUID REFERENCES trips(id),
@@ -108,7 +121,8 @@ CREATE TABLE driver_advances (
     status VARCHAR(20) DEFAULT 'Given', notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE TABLE app_users (
+
+CREATE TABLE IF NOT EXISTS app_users (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(256) NOT NULL,
@@ -116,43 +130,37 @@ CREATE TABLE app_users (
     status VARCHAR(20) DEFAULT 'Active',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
--- Default admin: username=admin, password=admin123 (change after first login)
-INSERT INTO app_users (username, password_hash, full_name, role) VALUES
-('admin', 'pbkdf2:sha256:600000$azad$e3b0c44298fc1c149afbf4c8996fb924', 'Administrator', 'admin');
 
-CREATE INDEX idx_trips_date ON trips(trip_date);
-CREATE INDEX idx_trips_vehicle ON trips(vehicle_id);
-CREATE INDEX idx_expenses_date ON expenses(expense_date);
-CREATE INDEX idx_invoices_customer ON invoices(customer_id);
-CREATE INDEX idx_payments_customer ON payments(customer_id);
+CREATE INDEX IF NOT EXISTS idx_trips_date ON trips(trip_date);
+CREATE INDEX IF NOT EXISTS idx_trips_vehicle ON trips(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_trips_customer ON trips(customer_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date);
+CREATE INDEX IF NOT EXISTS idx_expenses_vehicle ON expenses(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_customer ON invoices(customer_id);
+CREATE INDEX IF NOT EXISTS idx_payments_customer ON payments(customer_id);
+CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id);
 
 CREATE OR REPLACE FUNCTION update_modified_column()
 RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER trg_vehicles BEFORE UPDATE ON vehicles FOR EACH ROW EXECUTE FUNCTION update_modified_column();
-CREATE TRIGGER trg_drivers BEFORE UPDATE ON drivers FOR EACH ROW EXECUTE FUNCTION update_modified_column();
-CREATE TRIGGER trg_customers BEFORE UPDATE ON customers FOR EACH ROW EXECUTE FUNCTION update_modified_column();
-CREATE TRIGGER trg_trips BEFORE UPDATE ON trips FOR EACH ROW EXECUTE FUNCTION update_modified_column();
-CREATE TRIGGER trg_expenses BEFORE UPDATE ON expenses FOR EACH ROW EXECUTE FUNCTION update_modified_column();
-CREATE TRIGGER trg_invoices BEFORE UPDATE ON invoices FOR EACH ROW EXECUTE FUNCTION update_modified_column();
-CREATE TRIGGER trg_payments BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION update_modified_column();
 
-ALTER TABLE vehicles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE drivers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE trips ENABLE ROW LEVEL SECURITY;
-ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE invoice_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE driver_advances ENABLE ROW LEVEL SECURITY;
-ALTER TABLE app_users ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all" ON vehicles FOR ALL USING (true);
-CREATE POLICY "Allow all" ON drivers FOR ALL USING (true);
-CREATE POLICY "Allow all" ON customers FOR ALL USING (true);
-CREATE POLICY "Allow all" ON trips FOR ALL USING (true);
-CREATE POLICY "Allow all" ON expenses FOR ALL USING (true);
-CREATE POLICY "Allow all" ON invoices FOR ALL USING (true);
-CREATE POLICY "Allow all" ON invoice_items FOR ALL USING (true);
-CREATE POLICY "Allow all" ON payments FOR ALL USING (true);
-CREATE POLICY "Allow all" ON driver_advances FOR ALL USING (true);
-CREATE POLICY "Allow all" ON app_users FOR ALL USING (true);
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['vehicles','drivers','customers','trips','expenses','invoices','payments'] LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS trg_%1$s ON %1$s', t);
+    EXECUTE format('CREATE TRIGGER trg_%1$s BEFORE UPDATE ON %1$s FOR EACH ROW EXECUTE FUNCTION update_modified_column()', t);
+  END LOOP;
+END $$;
+
+-- Row Level Security: the app connects with the anon key and does its own login,
+-- so policies must allow the anon role. (See README → "Security notes".)
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['vehicles','drivers','customers','trips','expenses','invoices',
+                           'invoice_items','payments','driver_advances','app_users'] LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('DROP POLICY IF EXISTS "Allow all" ON %I', t);
+    EXECUTE format('CREATE POLICY "Allow all" ON %I FOR ALL USING (true) WITH CHECK (true)', t);
+  END LOOP;
+END $$;

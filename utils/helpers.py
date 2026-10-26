@@ -1,151 +1,97 @@
-"""
-Utility helpers for Azad Transport ERP
-"""
+"""Formatting helpers, Excel export, Streamlit version shims."""
+from __future__ import annotations
+import io
+from datetime import date, datetime
 import pandas as pd
-from datetime import datetime, date
+import streamlit as st
+
+_VER = tuple(int(x) for x in st.__version__.split(".")[:2] if x.isdigit())
+# `use_container_width` was replaced by `width="stretch"` in newer Streamlit versions.
+STRETCH = {"width": "stretch"} if _VER >= (1, 50) else {"use_container_width": True}
 
 
-def format_pkr(amount):
-    """Format amount as PKR currency."""
-    if amount is None:
-        return "PKR 0"
+def num(v, default: float = 0.0) -> float:
     try:
-        amt = float(amount)
-        if amt >= 10000000:
-            return f"PKR {amt/10000000:.2f} Cr"
-        elif amt >= 100000:
-            return f"PKR {amt/100000:.2f} Lac"
-        elif amt >= 1000:
-            return f"PKR {amt/1000:.1f}K"
-        return f"PKR {amt:,.0f}"
+        return float(v) if v is not None and v != "" else default
     except (ValueError, TypeError):
-        return "PKR 0"
+        return default
 
 
-def format_pkr_full(amount):
-    """Format amount as full PKR currency with commas."""
-    if amount is None:
-        return "PKR 0"
-    try:
-        return f"PKR {float(amount):,.0f}"
-    except (ValueError, TypeError):
-        return "PKR 0"
+def pkr(amount) -> str:
+    return f"PKR {num(amount):,.0f}"
 
 
-def format_tons(tons):
-    """Format tonnage value."""
-    if tons is None:
-        return "0 Tons"
-    try:
-        return f"{float(tons):,.2f} Tons"
-    except (ValueError, TypeError):
-        return "0 Tons"
+def pkr_short(amount) -> str:
+    a = num(amount)
+    s = "-" if a < 0 else ""
+    a = abs(a)
+    if a >= 10_000_000:
+        return f"{s}PKR {a / 10_000_000:.2f} Cr"
+    if a >= 100_000:
+        return f"{s}PKR {a / 100_000:.2f} Lac"
+    return f"{s}PKR {a:,.0f}"
 
 
-def format_date(d):
-    """Format date for display."""
-    if d is None:
-        return "-"
-    if isinstance(d, str):
-        try:
-            d = datetime.fromisoformat(d.replace("Z", "+00:00"))
-        except ValueError:
-            return d
-    if isinstance(d, datetime):
+def tons(v) -> str:
+    return f"{num(v):,.2f} T"
+
+
+def fmt_date(d) -> str:
+    if not d:
+        return "—"
+    if isinstance(d, (datetime, date)):
         return d.strftime("%d %b %Y")
-    if isinstance(d, date):
-        return d.strftime("%d %b %Y")
-    return str(d)
-
-
-def safe_divide(numerator, denominator):
-    """Safe division to avoid ZeroDivisionError."""
     try:
-        if denominator and float(denominator) != 0:
-            return float(numerator) / float(denominator)
-    except (ValueError, TypeError):
-        pass
-    return 0
+        return datetime.fromisoformat(str(d)[:10]).strftime("%d %b %Y")
+    except ValueError:
+        return str(d)
 
 
-def calculate_profit(revenue, expenses):
-    """Calculate profit from revenue and expenses."""
+def to_date(v) -> date | None:
+    if not v:
+        return None
+    if isinstance(v, datetime):
+        return v.date()
+    if isinstance(v, date):
+        return v
     try:
-        return float(revenue or 0) - float(expenses or 0)
-    except (ValueError, TypeError):
-        return 0
+        return date.fromisoformat(str(v)[:10])
+    except ValueError:
+        return None
 
 
-def data_to_df(response_data):
-    """Convert Supabase response data to DataFrame."""
-    if response_data and hasattr(response_data, 'data') and response_data.data:
-        return pd.DataFrame(response_data.data)
-    return pd.DataFrame()
+def safe_div(a, b) -> float:
+    b = num(b)
+    return num(a) / b if b else 0.0
 
 
-def get_month_range(year, month):
-    """Get start and end date for a month."""
-    start = date(year, month, 1)
-    if month == 12:
-        end = date(year + 1, 1, 1)
-    else:
-        end = date(year, month + 1, 1)
-    return start.isoformat(), end.isoformat()
-
-
-# Urdu/English Labels
-LABELS = {
-    "en": {
-        "dashboard": "Dashboard",
-        "vehicles": "Vehicles",
-        "trips": "Trips",
-        "drivers": "Drivers",
-        "customers": "Customers",
-        "expenses": "Expenses",
-        "billing": "Freight & Billing",
-        "payments": "Payments",
-        "reports": "Reports",
-        "settings": "Settings",
-        "add": "Add New",
-        "edit": "Edit",
-        "delete": "Delete",
-        "save": "Save",
-        "cancel": "Cancel",
-        "search": "Search",
-        "total": "Total",
-        "profit": "Profit",
-        "loss": "Loss",
-        "revenue": "Revenue",
-        "pending": "Pending",
-        "paid": "Paid",
-    },
-    "ur": {
-        "dashboard": "ڈیش بورڈ",
-        "vehicles": "گاڑیاں",
-        "trips": "ٹرپس",
-        "drivers": "ڈرائیور",
-        "customers": "کسٹمرز",
-        "expenses": "اخراجات",
-        "billing": "فریٹ اور بلنگ",
-        "payments": "ادائیگیاں",
-        "reports": "رپورٹیں",
-        "settings": "سیٹنگز",
-        "add": "نیا شامل کریں",
-        "edit": "ترمیم",
-        "delete": "حذف",
-        "save": "محفوظ",
-        "cancel": "منسوخ",
-        "search": "تلاش",
-        "total": "کل",
-        "profit": "نفع",
-        "loss": "نقصان",
-        "revenue": "آمدن",
-        "pending": "زیر التوا",
-        "paid": "ادا شدہ",
-    }
+STATUS_ICON = {
+    "active": "🟢", "completed": "🟢", "paid": "🟢", "delivered": "🟢", "received": "🟢",
+    "cleared": "🟢", "given": "🟢",
+    "pending": "🟡", "in transit": "🔵", "partial": "🟠", "billed": "🟣", "adjusted": "🟣",
+    "under maintenance": "🟠", "pending clearance": "🟡", "overdue": "🔴",
+    "inactive": "🔴", "cancelled": "🔴", "bounced": "🔴",
 }
 
 
-def get_label(key, lang="en"):
-    """Get label in specified language."""
-    return LABELS.get(lang, LABELS["en"]).get(key, key)
+def status_text(s) -> str:
+    if not s:
+        return "—"
+    return f"{STATUS_ICON.get(str(s).lower(), '⚪')} {s}"
+
+
+def to_excel_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as xw:
+        for name, df in sheets.items():
+            df.to_excel(xw, sheet_name=name[:31], index=False)
+            ws = xw.sheets[name[:31]]
+            for i, col in enumerate(df.columns, 1):
+                width = max([len(str(col))] + [len(str(x)) for x in df[col].head(200)]) + 3
+                ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = min(width, 45)
+    return buf.getvalue()
+
+
+def download_excel(label: str, sheets: dict[str, pd.DataFrame], filename: str, key: str) -> None:
+    st.download_button(label, to_excel_bytes(sheets), file_name=filename, key=key,
+                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
