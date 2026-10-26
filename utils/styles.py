@@ -108,7 +108,7 @@ box-shadow:0 24px 60px rgba(11,27,58,.35);border:1px solid rgba(212,175,55,.35);
 [data-testid="stMain"] [data-testid="stMarkdownContainer"] ul,[data-testid="stMain"] [data-testid="stMarkdownContainer"] ol{padding-left:1.3rem;}
 [data-testid="stMain"] [data-testid="stMarkdownContainer"] li::marker{color:var(--gold);font-weight:700;}
 [data-testid="stMain"] [data-testid="stMarkdownContainer"] code{background:#EEF2F8;color:#0B1B3A;border-radius:6px;padding:1px 6px;}
-[data-testid="stCaptionContainer"],[data-testid="stCaptionContainer"] *{color:#475569!important;}
+[data-testid="stCaptionContainer"],[data-testid="stCaptionContainer"] *{color:#475569!important;opacity:1!important;}
 label[data-testid="stWidgetLabel"] p,[data-testid="stWidgetLabel"] *{color:#1E293B!important;}
 .pg-title{color:var(--navy)!important;}.pg-sub{color:#475569!important;}
 .sec-title{color:var(--navy)!important;}

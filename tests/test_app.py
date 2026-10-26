@@ -128,14 +128,49 @@ from views import trips as tv
 try: tv._before_delete(rec); check("billed trip delete blocked", False)
 except db.DBError: check("billed trip delete blocked", True)
 
-# ───────── 6. Dropdown "add new" + quick add + invoice PDF ─────────
-# (AppTest cannot type a brand-new option; the browser flow was verified manually) — save a record with a custom category
-db.insert("expenses", {"expense_date": "2026-10-26", "category": "Parking Fee", "amount": 500})
+# ───────── 6. Dropdown Lists (add / remove), quick add, invoice PDF ─────────
+from utils import options
+K, D = options.list_key("expenses", "category"), ["Diesel", "Toll Tax", "Other"]
+check("defaults used when nothing customised", options.effective(K, D) == D)
+options.add(K, "Parking Fee", D)
+check("added option shows in list", options.effective(K, D) == D + ["Parking Fee"])
 at = view_test("expenses")
-check("custom value appears in dropdown next time", "Parking Fee" in at.selectbox(key="n_expenses_0_category").options)
+check("added option appears in the form dropdown", "Parking Fee" in at.selectbox(key="n_expenses_0_category").options)
+try: options.add(K, "parking fee", D); check("duplicate (any case) rejected", False)
+except db.DBError: check("duplicate (any case) rejected", True)
+options.remove(K, "Toll Tax", D)
+check("built-in option can be removed", "Toll Tax" not in options.effective(K, D))
+at = view_test("expenses")
+check("removed option gone from form dropdown", "Toll Tax" not in at.selectbox(key="n_expenses_0_category").options)
+check("removed built-in listed for restore", options.removed_defaults(K, D) == ["Toll Tax"])
+options.restore(K, "Toll Tax")
+check("removed option restored", "Toll Tax" in options.effective(K, D))
+options.remove(K, "Parking Fee", D)
+check("added option can be removed (row deleted)", "Parking Fee" not in options.effective(K, D))
+try: options.remove(options.list_key("x", "y"), "A", ["A"]); check("last option cannot be removed", False)
+except db.DBError: check("last option cannot be removed", True)
 from utils import crud
 check("status/freight_basis locked", not crud._allow_new({"key": "status"}) and not crud._allow_new({"key": "freight_basis"}) and crud._allow_new({"key": "category"}))
+
+at = view_test("dropdowns"); check("Dropdown Lists page renders", not at.exception, errs(at))
+check("list picker has every free dropdown", len(at.selectbox(key="dl_pick").options) >= 6, len(at.selectbox(key="dl_pick").options))
+_sb = at.selectbox(key="dl_pick"); _sb.select_index(list(_sb.options).index("Expenses  →  Category")).run()
+at.button(key="rm_expenses.category_0").click(); at.run()
+check("Remove button on page removes the option", "Diesel" not in options.effective(K, D), errs(at))
+# hide a vehicle from dropdowns (Inactive) — records stay
+vid = FAKE.tables["vehicles"][0]["id"]
+at = view_test("dropdowns"); at.segmented_control(key="dl_ent").set_value("🚛 Vehicles").run()
+at.button(key=f"hd_{vid}").click(); at.run()
+check("Hide sets vehicle Inactive", FAKE.tables["vehicles"][0]["status"] == "Inactive", errs(at))
+at = view_test("expenses")
+VN = FAKE.tables["vehicles"][0]["vehicle_number"]
+check("hidden vehicle not offered in dropdown", VN not in at.selectbox(key="n_expenses_0_vehicle_id").options, at.selectbox(key="n_expenses_0_vehicle_id").options)
+db.update("vehicles", vid, {"status": "Active"})
+at = view_test("expenses")
+check("vehicle back in dropdown after Show again", VN in at.selectbox(key="n_expenses_0_vehicle_id").options)
+
 at = view_test("trips"); check("trips shows ➕ quick-add buttons", any("New Customer" in b.label for b in at.button) and any("New Vehicle" in b.label for b in at.button), [b.label for b in at.button])
+at = view_test("dropdowns", user={"id": "v", "username": "v", "role": "viewer"}); check("viewer cannot edit lists", not at.exception and not any("Remove" in b.label for b in at.button))
 from utils.billing import invoice_pdf
 _inv = FAKE.tables["invoices"][0]
 _items = db.where("invoice_items", "invoice_id", _inv["id"])

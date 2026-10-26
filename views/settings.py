@@ -19,6 +19,7 @@ REQUIRED = {
     "payments": "id,amount,invoice_id,status",
     "driver_advances": "id,driver_id,amount",
     "app_users": "id,username,password_hash,role,status",
+    "dropdown_options": "id,list_key,value,is_hidden",
 }
 
 
@@ -124,7 +125,7 @@ def _system():
                 bad += 1
                 st.error(f"❌ `{table}` — {db.friendly(e)}")
         if bad:
-            st.warning("Open **migration_v2.sql** (included in the project), paste it in Supabase → SQL Editor → Run, then re-check.")
+            st.warning("Open **migration_v2.sql** (old columns) and/or **migration_v3_dropdowns.sql** (Dropdown Lists table) from the project, paste in Supabase → SQL Editor → Run, then re-check.")
         else:
             st.balloons()
 

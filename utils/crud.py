@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 import pandas as pd
 import streamlit as st
-from . import db
+from . import db, options
 from .db import DBError
 from .auth import can_edit
 from .helpers import STRETCH, num, pkr, tons, fmt_date, status_text, to_date, download_excel
@@ -24,9 +24,21 @@ def show_flash() -> None:
 
 
 # ───────────────────────── form building ─────────────────────────
-def fk_map(ref) -> dict:
+class FK(dict):
+    """id → label. `.hidden` = ids of Inactive records (shown in tables, but not offered in dropdowns)."""
+    hidden: set = frozenset()
+
+
+def fk_map(ref) -> FK:
     table, label = ref
-    return {r["id"]: (label(r) if callable(label) else str(r.get(label) or "—")) for r in db.fetch(table)}
+    rows = db.fetch(table)
+    m = FK({r["id"]: (label(r) if callable(label) else str(r.get(label) or "—")) for r in rows})
+    m.hidden = {r["id"] for r in rows if r.get("status") == "Inactive"}
+    return m
+
+
+def visible_ids(fkm) -> list:
+    return [i for i in fkm if i not in getattr(fkm, "hidden", ())]
 
 
 def _default(f):
@@ -42,15 +54,6 @@ LOCKED_SELECTS = {"status", "freight_basis"}
 
 def _allow_new(f: dict) -> bool:
     return f.get("add_new", f["key"] not in LOCKED_SELECTS)
-
-
-def _known_values(table: str, column: str) -> list[str]:
-    """Is table ke column mein pehle se save ki hui alag alag values (custom options yahin se aati hain)."""
-    try:
-        vals = {str(r.get(column)).strip() for r in db.fetch(table) if r.get(column) not in (None, "")}
-    except DBError:
-        return []
-    return sorted(vals, key=str.lower)
 
 
 def _widget(t, f: dict, val, key: str, fkm: dict | None, table: str | None = None):
@@ -72,16 +75,14 @@ def _widget(t, f: dict, val, key: str, fkm: dict | None, table: str | None = Non
                             min_value=DATE_MIN, max_value=DATE_MAX)
     if kind == "select":
         opts = list(f["options"])
-        if table:                                        # purani saved custom values bhi dropdown mein aayen
-            opts += [v for v in _known_values(table, f["key"]) if v not in opts]
+        if table and _allow_new(f):                      # "Dropdown Lists" page se add/remove ki hui values
+            opts = options.effective(options.list_key(table, f["key"]), opts)
         if val is not None and val not in opts:
             opts.insert(0, val)
-        if _allow_new(f):
-            return t.selectbox(label, opts, index=opts.index(val) if val in opts else 0, key=key, accept_new_options=True,
-                               help=(help_ + " · " if help_ else "") + "Nayi value add karne ke liye yahin type karke Enter dabayen")
         return t.selectbox(label, opts, index=opts.index(val) if val in opts else 0, key=key, help=help_)
     if kind == "fk":
-        ids = list(fkm or {})
+        hidden = getattr(fkm, "hidden", set())
+        ids = [i for i in (fkm or {}) if i not in hidden or i == val]      # Inactive (hidden) records dropdown mein nahi
         opts = ids if f.get("required") else [None] + ids
         idx = opts.index(val) if val in opts else 0
         return t.selectbox(label, opts, index=idx, key=key, help=help_,
@@ -334,7 +335,7 @@ def _new_tab(cfg: dict, fkmaps: dict):
     ver0 = st.session_state.setdefault(f"{t}_ver", 0)
     quick_add_buttons([(f["ref"][0], f"n_{t}_{ver0}_{f['key']}") for f in cfg["fields"] if f.get("kind") == "fk"])
     for f in cfg["fields"]:
-        if f.get("kind") == "fk" and f.get("required") and not fkmaps[f["key"]]:
+        if f.get("kind") == "fk" and f.get("required") and not visible_ids(fkmaps[f["key"]]):
             st.warning(f"⚠️ Please add at least one **{f['ref'][0].replace('_', ' ')}** record first — "
                        f"it is required for this form.")
             return

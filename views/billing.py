@@ -4,7 +4,7 @@ import streamlit as st
 from utils import db
 from utils.auth import can_edit
 from utils.billing import invoice_html, invoice_pdf
-from utils.crud import fk_map, flash, _delete_dialog, quick_add_buttons
+from utils.crud import fk_map, flash, _delete_dialog, quick_add_buttons, visible_ids
 from utils.db import DBError
 from utils.helpers import STRETCH, num, pkr, fmt_date, status_text, to_date, download_excel
 from utils.styles import page_header, section, kpi_row, empty_state
@@ -131,13 +131,14 @@ DELETE_CFG = dict(table="invoices", noun="Invoice", label=lambda r: r["invoice_n
 def _create_tab(customers: dict):
     ver = st.session_state.setdefault("inv_ver", 0)
     quick_add_buttons([("customers", f"ic_{ver}")])
-    if not customers:
+    pick = visible_ids(customers)
+    if not pick:
         st.warning("⚠️ Please add a customer first (use the ➕ button above).")
         return
     with st.container(border=True):
         section("1 · Customer & dates")
         c1, c2, c3 = st.columns(3)
-        cid = c1.selectbox("Customer", list(customers), format_func=lambda x: customers[x], key=f"ic_{ver}")
+        cid = c1.selectbox("Customer", pick, format_func=lambda x: customers[x], key=f"ic_{ver}")
         inv_date = c2.date_input("Invoice date", value=date.today(), key=f"id_{ver}", format="DD/MM/YYYY")
         cust = next((c for c in db.fetch("customers") if c["id"] == cid), {})
         terms = int(num(cust.get("payment_terms"), 30))

@@ -78,7 +78,7 @@ def login_screen() -> None:
 
 # ───────────────────────── main app ─────────────────────────
 def main_app() -> None:
-    from views import (advances, billing, customers, dashboard, drivers, expenses,
+    from views import (advances, billing, customers, dashboard, drivers, dropdowns, expenses,
                        payments, reports, settings, trips, vehicles)
 
     st.logo(os.path.join(BASE, "assets", "logo.svg"), icon_image=os.path.join(BASE, "assets", "icon.svg"))
@@ -101,7 +101,8 @@ def main_app() -> None:
             P(advances.render, "Driver Advances", ":material/handshake:", "advances"),
         ],
         "Insights": [P(reports.render, "Reports", ":material/monitoring:", "reports")],
-        "Administration": [P(settings.render, "Settings", ":material/settings:", "settings")],
+        "Administration": [P(dropdowns.render, "Dropdown Lists", ":material/tune:", "lists"),
+                           P(settings.render, "Settings", ":material/settings:", "settings")],
     }
     nav = st.navigation(pages)
 
