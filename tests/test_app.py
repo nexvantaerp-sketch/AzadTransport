@@ -128,5 +128,19 @@ from views import trips as tv
 try: tv._before_delete(rec); check("billed trip delete blocked", False)
 except db.DBError: check("billed trip delete blocked", True)
 
+# ───────── 6. Dropdown "add new" + quick add + invoice PDF ─────────
+# (AppTest cannot type a brand-new option; the browser flow was verified manually) — save a record with a custom category
+db.insert("expenses", {"expense_date": "2026-10-26", "category": "Parking Fee", "amount": 500})
+at = view_test("expenses")
+check("custom value appears in dropdown next time", "Parking Fee" in at.selectbox(key="n_expenses_0_category").options)
+from utils import crud
+check("status/freight_basis locked", not crud._allow_new({"key": "status"}) and not crud._allow_new({"key": "freight_basis"}) and crud._allow_new({"key": "category"}))
+at = view_test("trips"); check("trips shows ➕ quick-add buttons", any("New Customer" in b.label for b in at.button) and any("New Vehicle" in b.label for b in at.button), [b.label for b in at.button])
+from utils.billing import invoice_pdf
+_inv = FAKE.tables["invoices"][0]
+_items = db.where("invoice_items", "invoice_id", _inv["id"])
+_pdf = invoice_pdf(_inv, FAKE.tables["customers"][0], _items, {t["id"]: t for t in FAKE.tables["trips"]}, {v["id"]: v["vehicle_number"] for v in FAKE.tables["vehicles"]})
+check("invoice PDF generated", _pdf[:5] == b"%PDF-" and len(_pdf) > 1500)
+
 print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
 sys.exit(1 if FAIL else 0)

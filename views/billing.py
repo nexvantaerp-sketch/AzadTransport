@@ -3,8 +3,8 @@ import pandas as pd
 import streamlit as st
 from utils import db
 from utils.auth import can_edit
-from utils.billing import invoice_html
-from utils.crud import fk_map, flash, _delete_dialog
+from utils.billing import invoice_html, invoice_pdf
+from utils.crud import fk_map, flash, _delete_dialog, quick_add_buttons
 from utils.db import DBError
 from utils.helpers import STRETCH, num, pkr, fmt_date, status_text, to_date, download_excel
 from utils.styles import page_header, section, kpi_row, empty_state
@@ -102,10 +102,13 @@ def _detail(inv: dict, customers: dict):
             st.dataframe(pdf.style.format({"Amount": "{:,.0f}"}), hide_index=True, **STRETCH)
         if inv.get("notes"):
             st.info(inv["notes"])
-        x, y, _ = st.columns([1.3, 1, 3])
-        x.download_button("🖨️ Print / Download Invoice", invoice_html(inv, cust, items, trips, vehicles),
+        x, y, z, _ = st.columns([1.3, 1.1, 1, 2.2])
+        x.download_button("📄 Download PDF", invoice_pdf(inv, cust, items, trips, vehicles),
+                          file_name=f"{inv['invoice_number']}.pdf", mime="application/pdf", key=f"pdf_{inv['id']}",
+                          type="primary", **STRETCH)
+        y.download_button("🖨️ Print page (HTML)", invoice_html(inv, cust, items, trips, vehicles),
                           file_name=f"{inv['invoice_number']}.html", mime="text/html", key=f"dl_{inv['id']}", **STRETCH)
-        if can_edit() and y.button("🗑️ Delete", key=f"delinv_{inv['id']}", **STRETCH):
+        if can_edit() and z.button("🗑️ Delete", key=f"delinv_{inv['id']}", **STRETCH):
             _delete_dialog(DELETE_CFG, inv)
 
 
@@ -126,10 +129,11 @@ DELETE_CFG = dict(table="invoices", noun="Invoice", label=lambda r: r["invoice_n
 
 # ───────────────────────── create ─────────────────────────
 def _create_tab(customers: dict):
-    if not customers:
-        st.warning("⚠️ Please add a customer first.")
-        return
     ver = st.session_state.setdefault("inv_ver", 0)
+    quick_add_buttons([("customers", f"ic_{ver}")])
+    if not customers:
+        st.warning("⚠️ Please add a customer first (use the ➕ button above).")
+        return
     with st.container(border=True):
         section("1 · Customer & dates")
         c1, c2, c3 = st.columns(3)
